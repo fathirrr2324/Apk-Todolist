@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:todolist/widget/task_list.dart';
+import 'package:todolist/widget/search_bar.dart' as custom;
 import '../db/database_helper.dart';
 import '../models/todo.dart';
+import '../widget/add_task_bar.dart';
 
 void main() => runApp(MyApp());
 
@@ -23,18 +26,22 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   final _addController = TextEditingController();
   final _editController = TextEditingController();
+  final _searchController = TextEditingController();
   List<Todo> _todoList = [];
+  List<Todo> _filteredTodoList = [];
 
   @override
   void initState() {
     super.initState();
     _loadTodos();
+    _filteredTodoList = _todoList;
   }
 
   Future<void> _loadTodos() async {
     final todos = await DatabaseHelper.instance.getTodos();
     setState(() {
       _todoList = todos;
+      _filteredTodoList = todos;
     });
   }
 
@@ -92,11 +99,11 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Future<void> _sortTodos() async {
-    final sortedTodos = await DatabaseHelper.instance.getTodos();
-    sortedTodos.sort((a, b) => a.isDone.compareTo(b.isDone));
+  void _searchTodos(String query) {
     setState(() {
-      _todoList = sortedTodos;
+      _filteredTodoList = _todoList
+          .where((todo) => todo.title.toLowerCase().contains(query.toLowerCase()))
+          .toList();
     });
   }
 
@@ -104,60 +111,75 @@ class _HomePageState extends State<HomePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text("ToDo List"),
+        title: Text(
+          "ToDo List",
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+        elevation: 4,
+        backgroundColor: Colors.blueAccent,
+        centerTitle: true,
         actions: [
-          IconButton(
-            icon: Icon(Icons.sort),
-            onPressed: _sortTodos,
+          PopupMenuButton<String>(
+            onSelected: (value) {
+              if (value == 'All') {
+                setState(() {
+                  _filteredTodoList = _todoList;
+                });
+              } else if (value == 'Completed') {
+                setState(() {
+                  _filteredTodoList =
+                      _todoList.where((todo) => todo.isDone == 1).toList();
+                });
+              } else if (value == 'Pending') {
+                setState(() {
+                  _filteredTodoList =
+                      _todoList.where((todo) => todo.isDone == 0).toList();
+                });
+              }
+            },
+            itemBuilder: (context) => [
+              PopupMenuItem(
+                value: 'All',
+                child: Text('All Tasks'),
+              ),
+              PopupMenuItem(
+                value: 'Completed',
+                child: Text('Completed Tasks'),
+              ),
+              PopupMenuItem(
+                value: 'Pending',
+                child: Text('Pending Tasks'),
+              ),
+            ],
+            icon: Icon(Icons.filter_list),
           ),
         ],
       ),
       body: Column(
         children: [
-          Padding(
-            padding: EdgeInsets.all(12),
-            child: TextField(
-              controller: _addController,
-              decoration: InputDecoration(
-                labelText: 'Add Task',
-                suffixIcon: IconButton(
-                  icon: Icon(Icons.add),
-                  onPressed: _addTodo,
-                ),
-              ),
-            ),
+          // SearchBar widget
+            custom.SearchBar(
+            controller: _searchController,
+            onSearch: _searchTodos,
           ),
+          // AddTaskBar widget
+          AddTaskBar(
+            controller: _addController,
+            onAdd: _addTodo,
+          ),
+          // TaskList widget
           Expanded(
-            child: ListView.builder(
-              itemCount: _todoList.length,
-              itemBuilder: (context, index) {
-                final todo = _todoList[index];
-                return ListTile(
-                  title: Text(todo.title),
-                  leading: Checkbox(
-                    value: todo.isDone == 1,
-                    onChanged: (value) async {
-                      await DatabaseHelper.instance.updateTodoStatus(
-                        todo.id!,
-                        value! ? 1 : 0,
-                      );
-                      _loadTodos();
-                    },
-                  ),
-                  trailing: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      IconButton(
-                        icon: Icon(Icons.edit),
-                        onPressed: () => _editTodo(todo.id!, todo.title),
-                      ),
-                      IconButton(
-                        icon: Icon(Icons.delete),
-                        onPressed: () => _deleteTodo(todo.id!),
-                      ),
-                    ],
-                  ),
-                );
+            child: TaskList(
+              todoList: _filteredTodoList,
+              onToggleStatus: (id, isDone) async {
+                await DatabaseHelper.instance.updateTodoStatus(id, isDone == 1 ? 0 : 1);
+                _loadTodos();
+              },
+              onDelete: (id) async {
+                await _deleteTodo(id);
+              },
+              onEdit: (id, title) {
+                _editTodo(id, title);
               },
             ),
           ),
