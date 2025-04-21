@@ -1,26 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:todolist/db/database_helper.dart';
+import 'package:todolist/models/todo.dart';
+import 'package:todolist/widget/add_task_bar.dart';
 import 'package:todolist/widget/task_list.dart';
-import 'package:todolist/widget/search_bar.dart' as custom;
-import '../db/database_helper.dart';
-import '../models/todo.dart';
-import '../widget/add_task_bar.dart';
-
-void main() => runApp(MyApp());
-
-class MyApp extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'ToDo List',
-      theme: ThemeData(primarySwatch: Colors.blue),
-      home: HomePage(),
-    );
-  }
-}
+import 'package:todolist/widget/search_bar.dart'as custom;
 
 class HomePage extends StatefulWidget {
+  const HomePage({super.key});
+
   @override
-  _HomePageState createState() => _HomePageState();
+  State<HomePage> createState() => _HomePageState();
 }
 
 class _HomePageState extends State<HomePage> {
@@ -46,20 +35,51 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _addTodo() async {
-    if (_addController.text.isNotEmpty) {
-      await DatabaseHelper.instance.insertTodo(
-        Todo(
-          title: _addController.text,
-        ),
-      );
-      _addController.clear();
-      _loadTodos();
-    }
+  if (_addController.text.trim().isEmpty) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(       
+        content: Text('Input cannot be empety'),
+        backgroundColor: Colors.redAccent,
+      ),
+    );
+    return;
   }
 
-  Future<void> _deleteTodo(int id) async {
-    await DatabaseHelper.instance.deleteTodo(id);
+    await DatabaseHelper.instance.insertTodo(
+      Todo(
+        title: _addController.text.trim(),
+      ),
+    );
+    _addController.clear();
     _loadTodos();
+  }
+
+  
+
+  Future<void> _deleteTodo(int id) async {
+
+    
+    _loadTodos(); 
+    showDialog(context: context,
+    builder: (context){
+      return AlertDialog(
+        title: Text('You want to delete this?'),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () async {
+                  Navigator.of(context).pop();
+                 await DatabaseHelper.instance.deleteTodo(id);
+                  _loadTodos();
+                 
+              },  child: Text('ya'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text('Batal'),
+            ),
+          ],
+        );
+    });
   }
 
   Future<void> _editTodo(int id, String currentTitle) async {
@@ -157,17 +177,14 @@ class _HomePageState extends State<HomePage> {
       ),
       body: Column(
         children: [
-          // SearchBar widget
             custom.SearchBar(
             controller: _searchController,
             onSearch: _searchTodos,
           ),
-          // AddTaskBar widget
           AddTaskBar(
             controller: _addController,
             onAdd: _addTodo,
           ),
-          // TaskList widget
           Expanded(
             child: TaskList(
               todoList: _filteredTodoList,
