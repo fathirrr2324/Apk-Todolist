@@ -159,7 +159,7 @@ class _HomePageState extends State<HomePage> {
             },
             itemBuilder: (context) => [
               PopupMenuItem(
-                value: 'All',
+                value: 'Semua',
                 child: Text('All Tasks'),
               ),
               PopupMenuItem(
